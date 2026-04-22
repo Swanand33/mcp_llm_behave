@@ -34,6 +34,7 @@ packages = ["src/mcp_llm_behave"]
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "anyio>=4.0",
     "ruff>=0.4",
 ]
 
