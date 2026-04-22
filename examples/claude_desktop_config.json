@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mcp-llm-behave": {
+      "command": "uvx",
+      "args": ["mcp-llm-behave"]
+    }
+  }
+}

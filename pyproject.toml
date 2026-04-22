@@ -1,0 +1,48 @@
+[project]
+name = "mcp-llm-behave"
+version = "0.1.0"
+description = "MCP server exposing llm-behave behavioral regression testing as Claude tools"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Swanand Potnis", email = "workwithswanand@gmail.com" }]
+keywords = ["mcp", "llm", "testing", "behavioral", "regression", "claude"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "fastmcp>=2.0",
+    "llm-behave[semantic]>=0.1.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/Swanand33/mcp_llm_behave"
+Repository = "https://github.com/Swanand33/mcp_llm_behave"
+
+[project.scripts]
+mcp-llm-behave = "mcp_llm_behave.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_llm_behave"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
