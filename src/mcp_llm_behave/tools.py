@@ -1,9 +1,32 @@
 """The 3 tool implementations wrapping llm-behave."""
 
+import logging
+
 from llm_behave.engines.semantic import get_semantic_engine
+
+logger = logging.getLogger(__name__)
 
 _THRESHOLD_BEHAVIOR = 0.45
 _THRESHOLD_DRIFT = 0.80
+_MAX_INPUT_CHARS = 10_000
+
+
+def _validate(value: str, name: str) -> str:
+    """Validate that a text input is non-empty and within the character limit."""
+    stripped = value.strip() if isinstance(value, str) else ""
+    if not stripped:
+        raise ValueError(f"'{name}' must not be empty or whitespace-only.")
+    if len(stripped) > _MAX_INPUT_CHARS:
+        raise ValueError(
+            f"'{name}' is {len(stripped):,} chars — exceeds the "
+            f"{_MAX_INPUT_CHARS:,}-char limit. Truncate before testing."
+        )
+    return stripped
+
+
+def _clamp(score: float) -> float:
+    """Clamp cosine similarity to [0.0, 1.0] and round to 4 decimal places."""
+    return round(max(0.0, min(1.0, score)), 4)
 
 
 def run_behavior_test(prompt: str, expected_behavior: str, model_output: str) -> dict:
@@ -23,10 +46,15 @@ def run_behavior_test(prompt: str, expected_behavior: str, model_output: str) ->
             passed (bool): True if score >= threshold.
             threshold (float): The threshold used for pass/fail.
     """
+    expected_behavior = _validate(expected_behavior, "expected_behavior")
+    model_output = _validate(model_output, "model_output")
+
+    logger.debug("run_behavior_test | expected=%r | output_len=%d", expected_behavior, len(model_output))
+
     engine = get_semantic_engine()
-    score: float = engine.max_sentence_similarity(model_output, expected_behavior)
+    score = _clamp(engine.max_sentence_similarity(model_output, expected_behavior))
     return {
-        "score": round(score, 4),
+        "score": score,
         "passed": score >= _THRESHOLD_BEHAVIOR,
         "threshold": _THRESHOLD_BEHAVIOR,
     }
@@ -45,11 +73,16 @@ def compare_outputs(baseline: str, candidate: str) -> dict:
     Returns:
         dict with keys:
             similarity_score (float): Cosine similarity, 0.0–1.0.
-            drift_detected (bool): True if score < threshold.
+            drift_detected (bool): True if score < threshold (0.80).
             interpretation (str): Human-readable summary of the result.
     """
+    baseline = _validate(baseline, "baseline")
+    candidate = _validate(candidate, "candidate")
+
+    logger.debug("compare_outputs | baseline_len=%d | candidate_len=%d", len(baseline), len(candidate))
+
     engine = get_semantic_engine()
-    score: float = engine.similarity(baseline, candidate)
+    score = _clamp(engine.similarity(baseline, candidate))
 
     if score >= 0.90:
         interpretation = "Outputs are nearly identical — no drift."
@@ -61,7 +94,7 @@ def compare_outputs(baseline: str, candidate: str) -> dict:
         interpretation = "Low similarity — significant drift detected."
 
     return {
-        "similarity_score": round(score, 4),
+        "similarity_score": score,
         "drift_detected": score < _THRESHOLD_DRIFT,
         "interpretation": interpretation,
     }

@@ -2,7 +2,12 @@
 
 import pytest
 
-from mcp_llm_behave.tools import compare_outputs, list_builtin_behaviors, run_behavior_test
+from mcp_llm_behave.tools import (
+    _MAX_INPUT_CHARS,
+    compare_outputs,
+    list_builtin_behaviors,
+    run_behavior_test,
+)
 
 
 # --- run_behavior_test ---
@@ -59,6 +64,50 @@ def test_compare_outputs_returns_correct_keys():
     result = compare_outputs("hello world", "hello there")
     assert set(result.keys()) == {"similarity_score", "drift_detected", "interpretation"}
     assert isinstance(result["interpretation"], str)
+
+
+# --- input validation (hardening) ---
+
+def test_empty_model_output_raises():
+    with pytest.raises(ValueError, match="model_output"):
+        run_behavior_test(prompt="p", expected_behavior="something", model_output="")
+
+
+def test_whitespace_only_expected_behavior_raises():
+    with pytest.raises(ValueError, match="expected_behavior"):
+        run_behavior_test(prompt="p", expected_behavior="   ", model_output="some output")
+
+
+def test_oversized_input_raises():
+    big = "x" * (_MAX_INPUT_CHARS + 1)
+    with pytest.raises(ValueError, match="exceeds"):
+        run_behavior_test(prompt="p", expected_behavior="something", model_output=big)
+
+
+def test_empty_baseline_raises():
+    with pytest.raises(ValueError, match="baseline"):
+        compare_outputs(baseline="", candidate="some output")
+
+
+def test_empty_candidate_raises():
+    with pytest.raises(ValueError, match="candidate"):
+        compare_outputs(baseline="some output", candidate="  ")
+
+
+def test_score_always_in_range():
+    """Score must always be clamped to [0.0, 1.0] regardless of input."""
+    result = run_behavior_test(
+        prompt="p",
+        expected_behavior="completely unrelated concept xyz123",
+        model_output="The weather is nice today in the park.",
+    )
+    assert 0.0 <= result["score"] <= 1.0
+
+    result2 = compare_outputs(
+        baseline="completely different aardvark topic",
+        candidate="The weather is nice today in the park.",
+    )
+    assert 0.0 <= result2["similarity_score"] <= 1.0
 
 
 # --- list_builtin_behaviors ---
